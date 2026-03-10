@@ -7,10 +7,10 @@ connectDB()
       console.log("ERROR", error);
       throw error;
     });
-    
-    app.listen(process.env.PORT || 8000, () => {
+
+    app.listen(process.env.PORT || 3000, () => {
       console.log(
-        `server is listening on https://localhost:${process.env.PORT}`
+        `server is listening on http://localhost:${process.env.PORT}`
       );
     });
   })
