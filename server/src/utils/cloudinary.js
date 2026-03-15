@@ -15,7 +15,6 @@ export const uploadOnCloudinary = async (localFilePath) => {
     const response = await cloudinary.uploader.upload(localFilePath, {
       resource_type: "auto",
     });
-
     // console.log("file is uploaded successfully on cloudinary.", response.url);
     fs.unlinkSync(localFilePath);
     return response;
@@ -25,28 +24,21 @@ export const uploadOnCloudinary = async (localFilePath) => {
   }
 };
 
-export const deleteFromCloudinary = async (publicId, fileType) => {
-  if (!publicId) {
-    throw new ApiError(400, "Avatar's Public Id is missing");
-  }
-
-  let result;
-
+export const deleteFromCloudinary = async (publicId, fileType = "image") => {
   try {
-    if (fileType === "video") {
-      result = await cloudinary.uploader.destroy(publicId, {
-        resource_type: "video",
-      });
-    } else if (fileType === "image") {
-      result = await cloudinary.uploader.destroy(publicId, {
-        resource_type: "image",
-      });
+    if (!publicId) {
+      return null;
     }
+    const result = await cloudinary.uploader.destroy(publicId, {
+      resource_type: fileType,
+      invalidate: true,
+    });
 
-    if (result.result !== "ok" && result.result !== "not found") {
-      throw new ApiError(400, "Failed to delete file");
+    if (result.result === "ok" || result.result === "not found") {
+      return result;
+    } else {
+      throw new Error("Cloudinary deletion failed");
     }
-    return res;
   } catch (error) {
     throw new ApiError(
       400,

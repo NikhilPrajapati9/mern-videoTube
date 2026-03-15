@@ -68,9 +68,15 @@ export const registerUser = asyncHandler(async (req, res) => {
 
   const user = await User.create({
     fullName,
-    avatar: { url: avatar?.url, public_id: avatar?.public_id },
+    avatar: {
+      url: avatar?.secure_url || avatar?.url,
+      public_id: avatar?.public_id,
+    },
     coverImage: coverImage
-      ? { url: coverImage.url, public_id: coverImage.public_id }
+      ? {
+          url: coverImage?.secure_url || coverImage?.url,
+          public_id: coverImage.public_id,
+        }
       : undefined,
     username: username.toLowerCase(),
     email,
@@ -298,7 +304,12 @@ export const updateUserAvatar = asyncHandler(async (req, res) => {
   const user = await User.findByIdAndUpdate(
     req?.user._id,
     {
-      $set: { avatar: { url: avatar?.url, public_id: avatar?.public_id } },
+      $set: {
+        avatar: {
+          url: avatar?.secure_url || avatar?.url,
+          public_id: avatar?.public_id,
+        },
+      },
     },
     { new: true }
   ).select("-password");
@@ -346,7 +357,10 @@ export const updateUserCoverImage = asyncHandler(async (req, res) => {
     req?.user._id,
     {
       $set: {
-        coverImage: { url: coverImage?.url, public_id: coverImage?.public_id },
+        coverImage: {
+          url: coverImage?.secure_url || coverImage?.url,
+          public_id: coverImage?.public_id,
+        },
       },
     },
     { new: true }
@@ -446,6 +460,14 @@ export const getWatchedHistory = asyncHandler(async (req, res) => {
         foreignField: "_id",
         as: "watchHistory",
         pipeline: [
+          // 1. Filter: Sirf Published aur Non-deleted videos dikhao
+          {
+            $match: {
+              isPublished: true,
+              isDeleted: false,
+            },
+          },
+          // 2. Lookup: Video ke owner ki details fetch karo
           {
             $lookup: {
               from: "users",
@@ -470,17 +492,24 @@ export const getWatchedHistory = asyncHandler(async (req, res) => {
               },
             },
           },
+          // 3. Sorting: History hamesha latest first honi chahiye
+          // Note: Agar aapne watchHistory array mein push karte waqt order handle kiya hai toh zaroorat nahi,
+          // par aggregation mein order maintain karne ke liye $sort use kar sakte hain.
         ],
       },
     },
   ]);
+
+  if (!user || user.length === 0) {
+    throw new ApiError(404, "User not found");
+  }
 
   return res
     .status(200)
     .json(
       new ApiResponse(
         200,
-        user[0].watchHistory,
+        user[0]?.watchHistory || [],
         "Watch history fetched successfully"
       )
     );

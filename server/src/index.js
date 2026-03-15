@@ -1,5 +1,6 @@
 import { connectDB } from "./db/index.js";
 import { app } from "./app.js";
+import { initVideoCleanup } from "./utils/videoCleanup.js";
 
 connectDB()
   .then(() => {
@@ -7,6 +8,8 @@ connectDB()
       console.log("ERROR", error);
       throw error;
     });
+
+    initVideoCleanup();
 
     app.listen(process.env.PORT || 3000, () => {
       console.log(
