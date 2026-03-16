@@ -9,27 +9,38 @@ import {
 import { Video } from "../models/video.model.js";
 
 export const getAllVideos = asyncHandler(async (req, res) => {
-  const { page = 1, limit = 10, query, sortBy, sortType, userId } = req.query;
+  const {
+    page = 1,
+    limit = 10,
+    query,
+    sortBy = "createdAt",
+    sortType,
+    userId,
+  } = req.query;
 
   const pipeline = [];
 
-  //Search Query (Text search on title/description)
+  // 1. Initial Filter:
+  pipeline.push({
+    $match: {
+      isPublished: true,
+      isDeleted: false,
+    },
+  });
+
+  // 2. Search Query (Text search)
   if (query) {
     pipeline.push({
       $match: {
         $or: [
-          {
-            title: { $regex: query, $option: "i" },
-          },
-          {
-            description: { $regex: query, $option: "i" },
-          },
+          { title: { $regex: query, $options: "i" } },
+          { description: { $regex: query, $options: "i" } },
         ],
       },
     });
   }
 
-  //Filter by userId
+  // 3. Filter by specific userId
   if (userId) {
     if (!isValidObjectId(userId)) {
       throw new ApiError(400, "Invalid User ID");
@@ -41,23 +52,67 @@ export const getAllVideos = asyncHandler(async (req, res) => {
     });
   }
 
-  //Filter only published videos
+  // 4. Sorting
+  const sortColumn = sortBy || "createdAt";
+  const sortDirection = sortType === "asc" ? 1 : -1;
+
   pipeline.push({
-    $match: { isPublished: true, isDeleted: false },
+    $sort: {
+      [sortColumn]: sortDirection,
+    },
   });
 
-  //Sorting
-  if (sortBy && sortType) {
+  // 5. Pagination Options
+  const options = {
+    page: parseInt(page, 10),
+    limit: parseInt(limit, 10),
+  };
+
+  // 6. Execute Paginated Aggregation
+  const result = await Video.aggregatePaginate(
+    Video.aggregate(pipeline),
+    options
+  );
+
+  // Result Handling
+  if (!result || result.docs.length === 0) {
+    return res
+      .status(200)
+      .json(new ApiResponse(200, { docs: [] }, "No videos found"));
+  }
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, result, "Videos fetched successfully"));
+});
+
+export const getAllOwnVideos = asyncHandler(async (req, res) => {
+  const { page = 1, limit = 10, sortBy = "createdAt", sortType } = req.query;
+  const userId = req.user._id;
+
+  const pipeline = [];
+
+  //Filter by userId
+  if (userId) {
+    if (!isValidObjectId(userId)) {
+      throw new ApiError(400, "Invalid User ID");
+    }
     pipeline.push({
-      $sort: {
-        [sortBy]: sortType === "asc" ? 1 : -1,
+      $match: {
+        owner: new mongoose.Types.ObjectId(userId),
+        isDeleted: false,
       },
     });
-  } else {
-    pipeline.push({
-      $sort: { createdAt: -1 },
-    });
   }
+
+  const sortColumn = sortBy || "createdAt";
+  const sortDirection = sortType === "asc" ? 1 : -1;
+
+  pipeline.push({
+    $sort: {
+      [sortColumn]: sortDirection,
+    },
+  });
 
   //Pagination Options
   const options = {
@@ -79,6 +134,86 @@ export const getAllVideos = asyncHandler(async (req, res) => {
   return res
     .status(200)
     .json(new ApiResponse(200, result, "Videos fetched successfully"));
+});
+
+export const getAllDeletedVideos = asyncHandler(async (req, res) => {
+  const {
+    page = 1,
+    limit = 10,
+    sortBy = "deletedAt",
+    sortType = "desc",
+  } = req.query;
+  const userId = req.user._id;
+
+  const pipeline = [];
+
+  // 1. Match only DELETED videos of the logged-in user
+  pipeline.push({
+    $match: {
+      owner: new mongoose.Types.ObjectId(userId),
+      isDeleted: true,
+    },
+  });
+
+  // 2. Sorting (Default: Latest deleted first)
+  pipeline.push({
+    $sort: {
+      [sortBy]: sortType === "asc" ? 1 : -1,
+    },
+  });
+
+  // 3. Lookup: Agar aap video ke owner ki details dikhana chahte ke liye
+  pipeline.push({
+    $lookup: {
+      from: "users",
+      localField: "owner",
+      foreignField: "_id",
+      as: "ownerDetails",
+      pipeline: [
+        {
+          $project: {
+            username: 1,
+            avatar: 1,
+            fullName: 1,
+          },
+        },
+      ],
+    },
+  });
+
+  pipeline.push({
+    $addFields: {
+      ownerDetails: { $first: "$ownerDetails" },
+    },
+  });
+
+  // Pagination Options
+  const options = {
+    page: parseInt(page, 10),
+    limit: parseInt(limit, 10),
+  };
+
+  // Execute Paginated Aggregation
+  const result = await Video.aggregatePaginate(
+    Video.aggregate(pipeline),
+    options
+  );
+
+  if (!result || result.docs.length === 0) {
+    return res
+      .status(200)
+      .json(new ApiResponse(200, { docs: [] }, "Trash bin is empty"));
+  }
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        result,
+        "Deleted videos fetched successfully from trash"
+      )
+    );
 });
 
 export const uploadAVideo = asyncHandler(async (req, res) => {
@@ -238,33 +373,11 @@ export const deleteVideo = asyncHandler(async (req, res) => {
     throw new ApiError(403, "You do not have permission to delete this video");
   }
 
-  //delete old video and thumbnail if exist
-
-  // if (video.videoFile?.public_id) {
-  //   await deleteFromCloudinary(video.videoFile.public_id, "video");
-  // }
-
-  // if (video.thumbnail?.public_id) {
-  //   await deleteFromCloudinary(video.thumbnail.public_id, "video");
-  // }
-
   // remove document from database
   await Video.findByIdAndUpdate(videoId, {
     isDeleted: true,
     deletedAt: new Date(),
   });
-
-  // Playlist se video remove karna
-  // await Playlist.updateMany(
-  //   { videos: videoId }, // Jahan bhi ye video ID ho
-  //   { $pull: { videos: videoId } } // Use array se nikal do
-  // );
-
-  // // Watch History se remove karna
-  // await User.updateMany(
-  //   { watchHistory: videoId },
-  //   { $pull: { watchHistory: videoId } }
-  // );
 
   return res
     .status(200)
@@ -303,7 +416,6 @@ export const recoverVideo = asyncHandler(async (req, res) => {
     .status(200)
     .json(new ApiResponse(200, updatedVideo, "Video recover successfully"));
 });
-
 
 export const togglePublishStatus = asyncHandler(async (req, res) => {
   const { videoId } = req.params;
