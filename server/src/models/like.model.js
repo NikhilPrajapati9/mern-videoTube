@@ -1,16 +1,17 @@
 import mongoose, { Schema } from "mongoose";
+import aggregatePaginate from "mongoose-aggregate-paginate-v2";
 
 const likeSchema = new Schema(
   {
-    video: {
+    videoId: {
       type: Schema.Types.ObjectId,
       ref: "Video",
     },
-    comment: {
+    commentId: {
       type: Schema.Types.ObjectId,
       ref: "Comment",
     },
-    tweet: {
+    tweetId: {
       type: Schema.Types.ObjectId,
       ref: "Tweet",
     },
@@ -23,5 +24,7 @@ const likeSchema = new Schema(
     timestamps: true,
   }
 );
+
+likeSchema.plugin(aggregatePaginate);
 
 export const Like = mongoose.model("Like", likeSchema);
