@@ -86,56 +86,6 @@ export const getAllVideos = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, result, "Videos fetched successfully"));
 });
 
-export const getAllOwnVideos = asyncHandler(async (req, res) => {
-  const { page = 1, limit = 10, sortBy = "createdAt", sortType } = req.query;
-  const userId = req.user._id;
-
-  const pipeline = [];
-
-  //Filter by userId
-  if (userId) {
-    if (!isValidObjectId(userId)) {
-      throw new ApiError(400, "Invalid User ID");
-    }
-    pipeline.push({
-      $match: {
-        owner: new mongoose.Types.ObjectId(userId),
-        isDeleted: false,
-      },
-    });
-  }
-
-  const sortColumn = sortBy || "createdAt";
-  const sortDirection = sortType === "asc" ? 1 : -1;
-
-  pipeline.push({
-    $sort: {
-      [sortColumn]: sortDirection,
-    },
-  });
-
-  //Pagination Options
-  const options = {
-    page: parseInt(page, 10),
-    limit: parseInt(limit, 10),
-  };
-
-  //Execute Paginated Aggregation
-
-  const result = await Video.aggregatePaginate(
-    Video.aggregate(pipeline),
-    options
-  );
-
-  if (!result || !result.docs.length === 0) {
-    return res.status(200).json(new ApiResponse(200, [], "No videos found"));
-  }
-
-  return res
-    .status(200)
-    .json(new ApiResponse(200, result, "Videos fetched successfully"));
-});
-
 export const getAllDeletedVideos = asyncHandler(async (req, res) => {
   const {
     page = 1,
