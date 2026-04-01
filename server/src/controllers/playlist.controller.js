@@ -1,10 +1,10 @@
 import mongoose from "mongoose";
-import { Playlist } from "../models/playlist.model.js";
 import { ApiError } from "../utils/ApiError.js";
-import { ApiResponse } from "../utils/ApiResponse.js";
-import { asyncHandler } from "../utils/asynHandler.js";
-import { PlaylistVideo } from "../models/playlistVideos.model.js";
 import { Video } from "../models/video.model.js";
+import { ApiResponse } from "../utils/ApiResponse.js";
+import { Playlist } from "../models/playlist.model.js";
+import { asyncHandler } from "../utils/asyncHandler.js";
+import { PlaylistVideo } from "../models/playlistVideos.model.js";
 
 export const createPlaylist = asyncHandler(async (req, res) => {
   const { name, description } = req.body;

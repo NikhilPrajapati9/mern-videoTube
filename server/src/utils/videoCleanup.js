@@ -1,6 +1,6 @@
 import cron from "node-cron";
 import { Video } from "../models/video.model.js";
-import { deleteFromCloudinary } from "./utils/cloudinary.js";
+import { deleteFromCloudinary } from "./cloudinary.js";
 
 // Yeh function har raat 12 baje chalega (0 0 * * *)
 export const initVideoCleanup = () => {

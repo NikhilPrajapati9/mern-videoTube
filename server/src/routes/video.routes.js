@@ -1,16 +1,16 @@
 import { Router } from "express";
-import { verifyJWT } from "../middlewares/auth.middleware";
+import { verifyJWT } from "../middlewares/auth.middleware.js";
 import {
+  deleteVideo,
   getAllDeletedVideos,
   getAllVideos,
-  getUserVideos,
   getVideoById,
   recoverVideo,
   togglePublishStatus,
   updateVideo,
   uploadAVideo,
-} from "../controllers/video.controller";
-import { upload } from "../middlewares/multer.middleware";
+} from "../controllers/video.controller.js";
+import { upload } from "../middlewares/multer.middleware.js";
 
 const router = Router();
 router.use(verifyJWT);
@@ -32,13 +32,13 @@ router
     uploadAVideo
   );
 
-router.route("deletedVideo").get(getAllDeletedVideos);
+router.route("/deletedVideo").get(getAllDeletedVideos);
 
 router
   .route("/:videoId")
   .get(getVideoById)
   .delete(deleteVideo)
-  .patch(upload.single(thumbnail), updateVideo);
+  .patch(upload.single("thumbnail"), updateVideo);
 
 router.route("/recover/:videoId").patch(recoverVideo);
 router.route("/toggle/pusblish/:videoId").patch(togglePublishStatus);

@@ -2,7 +2,7 @@ import jwt from "jsonwebtoken";
 import { User } from "../models/user.model.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
-import { asyncHandler } from "../utils/asynHandler.js";
+import { asyncHandler } from "../utils/asyncHandler.js";
 import {
   deleteFromCloudinary,
   uploadOnCloudinary,
@@ -34,8 +34,8 @@ const generateAccessAndRefrehToken = async (userId) => {
 
 export const registerUser = asyncHandler(async (req, res) => {
   const { username, email, fullName, password } = req.body;
-  const avatarLocalPath = req.files?.avatar[0]?.path;
-  const coverImageLocalPath = req.files?.coverImage[0]?.path;
+  const avatarLocalPath = req.files?.avatar?.[0]?.path;
+  const coverImageLocalPath = req.files?.coverImage?.[0]?.path;
 
   if (
     [username, email, fullName, password].some((field) => field?.trim() === "")
@@ -181,7 +181,7 @@ export const refreshAccessToken = asyncHandler(async (req, res) => {
   try {
     const decodedToken = jwt.verify(
       incomingRefreshToken,
-      proccess.env.REFRESH_TOKEN_SECRET
+      process.env.REFRESH_TOKEN_SECRET
     );
 
     const user = await User.findById(decodedToken._id);
@@ -248,16 +248,31 @@ export const getCurrentUser = asyncHandler(async (req, res) => {
 });
 
 export const updateAccountDetails = asyncHandler(async (req, res) => {
-  const { fullName, email } = req.body;
+  const { fullName, username } = req.body;
 
-  if ([fullName, email].some((field) => !field?.trim())) {
-    throw new ApiError(400, "All fields are required");
+  if (!fullName?.trim() || !username?.trim()) {
+    throw new ApiError(400, "Full name and username are required");
+  }
+
+  const existingUser = await User.findOne({
+    username,
+    _id: { $ne: req.user._id },
+  });
+
+  if (existingUser) {
+    throw new ApiError(
+      409,
+      "This username is already taken. Please try another one."
+    );
   }
 
   const user = await User.findByIdAndUpdate(
     req.user._id,
     {
-      $set: { fullName, email },
+      $set: {
+        fullName: fullName.trim(),
+        username: username.toLowerCase().trim(),
+      },
     },
     { new: true }
   ).select("-password -refreshToken");
@@ -265,6 +280,29 @@ export const updateAccountDetails = asyncHandler(async (req, res) => {
   return res
     .status(200)
     .json(new ApiResponse(200, user, "Account details updated successfully."));
+});
+
+export const checkUsernameAvailability = asyncHandler(async (req, res) => {
+  const { username } = req.query;
+
+  if (!username) {
+    throw new ApiError(400, "Username is required");
+  }
+
+  // Database mein index hone ki wajah se ye query super-fast hogi
+  const existingUser = await User.findOne({
+    username: username.toLowerCase().trim(),
+  });
+
+  if (existingUser) {
+    return res
+      .status(200)
+      .json(new ApiResponse(200, { available: false }, "Username taken"));
+  }
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, { available: true }, "Username available"));
 });
 
 export const updateUserAvatar = asyncHandler(async (req, res) => {
@@ -276,7 +314,9 @@ export const updateUserAvatar = asyncHandler(async (req, res) => {
 
   const avatar = await uploadOnCloudinary(avatarLocalPath);
 
-  if (!avatar.url || !!avatar.public_id) {
+  console.log("avatar res=>", avatar);
+
+  if (!avatar?.url || !avatar?.public_id) {
     throw new ApiError(400, "Error while uploading on avtar files.");
   }
 
@@ -326,9 +366,9 @@ export const updateUserCoverImage = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Avatar file is missing.");
   }
 
-  const coverImage = await uploadOnCloudinary(avatarLocalPath);
+  const coverImage = await uploadOnCloudinary(coverImageLocalPath);
 
-  if (!coverImage.url || !!coverImage.public_id) {
+  if (!coverImage?.url || !coverImage?.public_id) {
     throw new ApiError(400, "Error while uploading on coverImage files.");
   }
 
@@ -381,7 +421,7 @@ export const getUserChannelProfile = asyncHandler(async (req, res) => {
   const channel = await User.aggregate([
     {
       $match: {
-        username: username?.toLowerCase(),
+        username: username?.toLowerCase().trim(),
       },
     },
     {
@@ -412,9 +452,9 @@ export const getUserChannelProfile = asyncHandler(async (req, res) => {
           $cond: {
             if: {
               $in: [req.user?._id, "$subscribers.subscriber"],
-              then: true,
-              else: false,
             },
+            then: true,
+            else: false,
           },
         },
       },
