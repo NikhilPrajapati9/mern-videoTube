@@ -1,4 +1,4 @@
-import { isValidObjectId } from "mongoose";
+import mongoose, { isValidObjectId } from "mongoose";
 import { Like } from "../models/like.model.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
@@ -56,18 +56,18 @@ export const toggleCommentLike = asyncHandler(async (req, res) => {
       .json(
         new ApiResponse(200, { isLiked: false }, "Comment Unliked successfully")
       );
+  } else {
+    await Like.create({
+      commentId: commentId,
+      likedBy: req.user?._id,
+    });
+
+    return res
+      .status(200)
+      .json(
+        new ApiResponse(200, { isLiked: true }, "Comment liked successfully")
+      );
   }
-
-  await Like.create({
-    CommentId: commentId,
-    likedBy: req.user?._id,
-  });
-
-  return res
-    .status(200)
-    .json(
-      new ApiResponse(200, { isLiked: true }, "Comment liked successfully")
-    );
 });
 
 export const toggleTweetLike = asyncHandler(async (req, res) => {
@@ -110,6 +110,7 @@ export const getLikedVideos = asyncHandler(async (req, res) => {
     {
       $match: {
         likedBy: new mongoose.Types.ObjectId(userId),
+        // Sirf un likes ko lo jo videos par hain (not comments/tweets)
         videoId: { $exists: true, $ne: null },
       },
     },
@@ -131,31 +132,47 @@ export const getLikedVideos = asyncHandler(async (req, res) => {
                   $project: {
                     username: 1,
                     fullName: 1,
-                    avatar: 1,
+                    avatar: {
+                      url: 1,
+                    }, // Avatar.url apne aap include ho jayega agar nested hai
                   },
                 },
               ],
             },
           },
           {
-            $addFields: { owner: { $first: "$owner" } },
+            $addFields: {
+              owner: { $first: "$owner" },
+            },
           },
         ],
       },
     },
+    // Array ko object mein badle taaki dot notation (video.isPublished) kaam kare
     { $unwind: "$video" },
     {
       $match: {
-        "video.isPublished": true,
+        "video.isPublished": true, // Sirf wahi videos jo public hain
       },
     },
     {
-      $sort: { created: -1 },
+      $sort: {
+        createdAt: -1, // Sahi field name 'createdAt' hai
+      },
     },
     {
       $project: {
         _id: 1,
-        video: 1,
+        video: {
+          _id: 1,
+          title: 1,
+          description: 1,
+          duration: 1,
+          views: 1,
+          thumbnail: { url: 1 },
+          owner: 1,
+          createdAt: 1,
+        },
       },
     },
   ]);
@@ -200,7 +217,6 @@ export const getLikedComments = asyncHandler(async (req, res) => {
       },
     },
     {
-      // 2. Lookup: Comment ki details fetch karein
       $lookup: {
         from: "comments",
         localField: "commentId",
@@ -208,29 +224,46 @@ export const getLikedComments = asyncHandler(async (req, res) => {
         as: "comment",
         pipeline: [
           {
-            // 3. Nested Lookup: Comment likhne waale ki detail (Comment Owner)
             $lookup: {
               from: "users",
               localField: "owner",
               foreignField: "_id",
               as: "commentOwner",
-              pipeline: [{ $project: { username: 1, avatar: 1, fullName: 1 } }],
+              pipeline: [
+                {
+                  $project: {
+                    username: 1,
+                    avatar: {
+                      url: 1,
+                    },
+                    fullName: 1,
+                  },
+                },
+              ],
             },
           },
           {
-            // 4. Nested Lookup: Yeh comment kis video par hai
             $lookup: {
               from: "videos",
-              localField: "video",
+              localField: "videoId",
               foreignField: "_id",
               as: "videoInfo",
-              pipeline: [{ $project: { title: 1, thumbnail: 1 } }],
+              pipeline: [
+                {
+                  $project: {
+                    title: 1,
+                    thumbnail: {
+                      url: 1,
+                    },
+                  },
+                },
+              ],
             },
           },
           {
             $addFields: {
-              owner: { $first: "$commentOwner" },
-              video: { $first: "$videoInfo" },
+              commentOwner: { $first: "$commentOwner" },
+              videoInfo: { $first: "$videoInfo" },
             },
           },
         ],
@@ -285,14 +318,12 @@ export const getLikedTweets = asyncHandler(async (req, res) => {
 
   const likedTweetsAggregation = Like.aggregate([
     {
-      //  Match: Sirf woh likes jo "Tweet" ke hain aur is user ne kiye hain
       $match: {
         likedBy: new mongoose.Types.ObjectId(userId),
         tweetId: { $exists: true, $ne: null },
       },
     },
     {
-      //  Lookup: Tweet ki actual details fetch karein
       $lookup: {
         from: "tweets",
         localField: "tweetId",
@@ -300,18 +331,27 @@ export const getLikedTweets = asyncHandler(async (req, res) => {
         as: "tweet",
         pipeline: [
           {
-            //  Nested Lookup: Tweet likhne waale user ki details
             $lookup: {
               from: "users",
               localField: "owner",
               foreignField: "_id",
               as: "tweetOwner",
-              pipeline: [{ $project: { username: 1, avatar: 1, fullName: 1 } }],
+              pipeline: [
+                {
+                  $project: {
+                    username: 1,
+                    avatar: {
+                      url: 1,
+                    },
+                    fullName: 1,
+                  },
+                },
+              ],
             },
           },
           {
             $addFields: {
-              owner: { $first: "$tweetOwner" },
+              tweetOwner: { $first: "$tweetOwner" },
             },
           },
         ],
@@ -319,14 +359,13 @@ export const getLikedTweets = asyncHandler(async (req, res) => {
     },
     { $unwind: "$tweet" },
     {
-      // Sort: Naye liked tweets sabse upar
       $sort: { createdAt: -1 },
     },
     {
       $project: {
         _id: 1,
         tweet: 1,
-        createdAt: 1, // Ye Like create hone ki date hai
+        createdAt: 1,
       },
     },
   ]);

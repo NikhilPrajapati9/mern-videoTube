@@ -1,8 +1,10 @@
-import mongoose from "mongoose";
+import mongoose, { isValidObjectId } from "mongoose";
 import { Comment } from "../models/comment.model.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
+import { Video } from "../models/video.model.js";
+import { Like } from "../models/like.model.js";
 
 export const getVideoComments = asyncHandler(async (req, res) => {
   const { videoId } = req.params;
@@ -15,8 +17,7 @@ export const getVideoComments = asyncHandler(async (req, res) => {
   const aggregate = Comment.aggregate([
     {
       $match: {
-        // Dhyaan dein: Agar schema mein field 'video' hai toh 'video' likhein
-        video: new mongoose.Types.ObjectId(videoId),
+        videoId: new mongoose.Types.ObjectId(videoId),
       },
     },
     {
@@ -94,7 +95,7 @@ export const addComment = asyncHandler(async (req, res) => {
 
   const comment = await Comment.create({
     content: content.trim(),
-    video: videoId,
+    videoId: videoId,
     owner: req.user?._id,
   });
 

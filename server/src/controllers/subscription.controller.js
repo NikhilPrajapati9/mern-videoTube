@@ -1,6 +1,8 @@
 import mongoose, { isValidObjectId } from "mongoose";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { Subscription } from "../models/subscription.model.js";
+import { ApiError } from "../utils/ApiError.js";
+import { ApiResponse } from "../utils/ApiResponse.js";
 
 export const toggleSubscription = asyncHandler(async (req, res) => {
   const { channelId } = req.params;
@@ -56,7 +58,6 @@ export const toggleSubscription = asyncHandler(async (req, res) => {
 export const getUserChannelSubscribers = asyncHandler(async (req, res) => {
   const { channelId } = req.params;
 
-  // 1. Validation: Check if channelId is a valid MongoDB ID
   if (!isValidObjectId(channelId)) {
     throw new ApiError(400, "Invalid Channel ID");
   }
@@ -78,7 +79,9 @@ export const getUserChannelSubscribers = asyncHandler(async (req, res) => {
             $project: {
               username: 1,
               fullName: 1,
-              avatar: 1,
+              avatar: {
+                url: 1,
+              },
             },
           },
         ],
@@ -110,21 +113,17 @@ export const getUserChannelSubscribers = asyncHandler(async (req, res) => {
 export const getSubscribedChannels = asyncHandler(async (req, res) => {
   const { subscriberId } = req.params;
 
-  // 1. Validation
   if (!isValidObjectId(subscriberId)) {
     throw new ApiError(400, "Invalid Subscriber ID");
   }
 
-  // 2. Aggregation Pipeline
   const subscribedChannels = await Subscription.aggregate([
     {
-      // Match: Woh saari entries jahan 'subscriber' hamara subscriberId hai
       $match: {
         subscriber: new mongoose.Types.ObjectId(subscriberId),
       },
     },
     {
-      // Lookup: Channel (User) ki details fetch karein
       $lookup: {
         from: "users",
         localField: "channel",
@@ -135,7 +134,9 @@ export const getSubscribedChannels = asyncHandler(async (req, res) => {
             $project: {
               username: 1,
               fullName: 1,
-              avatar: 1,
+              avatar: {
+                url: 1,
+              },
             },
           },
         ],

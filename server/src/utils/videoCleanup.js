@@ -1,35 +1,57 @@
 import cron from "node-cron";
 import { Video } from "../models/video.model.js";
+import { Comment } from "../models/comment.model.js"; // Import Comment model
+import { Like } from "../models/like.model.js";       // Import Like model
 import { deleteFromCloudinary } from "./cloudinary.js";
 
-// Yeh function har raat 12 baje chalega (0 0 * * *)
 export const initVideoCleanup = () => {
+  // Har raat 12 baje chalega
   cron.schedule("0 0 * * *", async () => {
-    console.log("Running daily cleanup task...");
+    console.log("--- Starting Daily Permanent Cleanup Task ---");
 
     const tenDaysAgo = new Date();
-    tenDaysAgo.setDate(tenDaysAgo.getDate() - 10); // Aaj se 10 din pehle ki date
+    tenDaysAgo.setDate(tenDaysAgo.getDate() - 10);
 
-    // 1. Un videos ko dhoondo jo isDeleted: true hain aur deletedAt 10 din se purana hai
+    // 1. Un videos ko dhoondo jo 10 din pehle soft-delete hui thi
     const videosToDelete = await Video.find({
       isDeleted: true,
-      deletedAt: { $lte: tenDaysAgo }, // $lte matlab Less Than or Equal to (10 din ya usse purana)
+      deletedAt: { $lte: tenDaysAgo },
     });
 
-    if (videosToDelete.length > 0) {
-      for (const video of videosToDelete) {
-        // 2. Cloudinary se files delete karein
-        if (video.video?.public_id) {
-          await deleteFromCloudinary(video.video.public_id, "video");
+    if (videosToDelete.length === 0) {
+      console.log("No videos found for permanent deletion.");
+      return;
+    }
+
+    for (const video of videosToDelete) {
+      try {
+        const videoId = video._id;
+
+        // 2. Cloudinary se Assets delete karein
+        if (video?.videoFile?.public_id) {
+          await deleteFromCloudinary(video.videoFile.public_id, "video");
         }
-        if (video.thumbnail?.public_id) {
+        if (video?.thumbnail?.public_id) {
           await deleteFromCloudinary(video.thumbnail.public_id, "image");
         }
 
-        // 3. Database se permanent delete karein
-        await Video.findByIdAndDelete(video._id);
+        // 3. Database Cleanup (Relational Data)
+        // Video se jude saare comments uda do
+        await Comment.deleteMany({ videoId: videoId });
+        
+        // Video se jude saare likes (Video likes + Comment likes) uda do
+        // Note: Agar aapne Like schema mein videoId rakha hai toh:
+        await Like.deleteMany({ videoId: videoId });
+
+        // 4. Video document ko permanent delete karein
+        await Video.findByIdAndDelete(videoId);
+
+        console.log(`Successfully purged video and its data: ${videoId}`);
+      } catch (error) {
+        console.error(`Error purging video ${video._id}:`, error.message);
       }
-      console.log(`${videosToDelete.length} videos permanently deleted.`);
     }
+    
+    console.log(`Cleanup completed for ${videosToDelete.length} videos.`);
   });
 };

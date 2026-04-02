@@ -4,7 +4,8 @@ import {
   createPlaylist,
   deletePlaylist,
   getOwnPlaylists,
-  getPlaylistById,
+  getPlaylistDataById,
+  getPlaylistVideosById,
   getUserPlaylists,
   removeVideoFromPlaylist,
   togglePublishStatus,
@@ -20,12 +21,13 @@ router.route("/").get(getOwnPlaylists).post(createPlaylist);
 router.route("/user/:userId").get(getUserPlaylists);
 router
   .route("/:playlistId")
-  .get(getPlaylistById)
+  .get(getPlaylistDataById)
   .delete(deletePlaylist)
   .patch(updatePlaylist);
 
 router.route("/add/:playlistId/:videoId").post(addVideoToPlaylist);
 router.route("/remove/:playlistId/:videoId").post(removeVideoFromPlaylist);
-router.route("/toggle/pusblish/:playlistId").post(togglePublishStatus);
+router.route("/toggle/pusblish/:playlistId").patch(togglePublishStatus);
+router.route("/videos/:playlistId").get(getPlaylistVideosById);
 
 export default router;
