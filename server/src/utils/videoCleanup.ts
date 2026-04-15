@@ -1,7 +1,7 @@
 import cron from "node-cron";
 import { Video } from "../models/video.model.js";
 import { Comment } from "../models/comment.model.js"; // Import Comment model
-import { Like } from "../models/like.model.js";       // Import Like model
+import { Like } from "../models/like.model.js"; // Import Like model
 import { deleteFromCloudinary } from "./cloudinary.js";
 
 export const initVideoCleanup = () => {
@@ -38,7 +38,7 @@ export const initVideoCleanup = () => {
         // 3. Database Cleanup (Relational Data)
         // Video se jude saare comments uda do
         await Comment.deleteMany({ videoId: videoId });
-        
+
         // Video se jude saare likes (Video likes + Comment likes) uda do
         // Note: Agar aapne Like schema mein videoId rakha hai toh:
         await Like.deleteMany({ videoId: videoId });
@@ -48,10 +48,13 @@ export const initVideoCleanup = () => {
 
         console.log(`Successfully purged video and its data: ${videoId}`);
       } catch (error) {
-        console.error(`Error purging video ${video._id}:`, error.message);
+        console.error(
+          `Error purging video ${video._id}:`,
+          error instanceof Error ? error.message : String(error)
+        );
       }
     }
-    
+
     console.log(`Cleanup completed for ${videosToDelete.length} videos.`);
   });
 };

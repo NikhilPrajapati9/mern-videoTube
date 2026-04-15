@@ -4,8 +4,9 @@ import { Tweet } from "../models/tweet.model.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { Like } from "../models/like.model.js";
+import { Request, Response } from "express";
 
-export const createTweet = asyncHandler(async (req, res) => {
+export const createTweet = asyncHandler(async (req: Request, res: Response) => {
   const { content } = req.body;
 
   if (!content || content.trim() === "") {
@@ -26,77 +27,79 @@ export const createTweet = asyncHandler(async (req, res) => {
     .json(new ApiResponse(201, newTweet, "Tweet created successfully"));
 });
 
-export const getUserTweets = asyncHandler(async (req, res) => {
-  const { userId } = req.params;
+export const getUserTweets = asyncHandler(
+  async (req: Request, res: Response) => {
+    const { userId } = req.params as { userId: string };
 
-  if (!mongoose.isValidObjectId(userId)) {
-    throw new ApiError(400, "Invalid User ID");
-  }
+    if (!mongoose.isValidObjectId(userId)) {
+      throw new ApiError(400, "Invalid User ID");
+    }
 
-  const tweets = await Tweet.aggregate([
-    {
-      $match: {
-        owner: new mongoose.Types.ObjectId(userId),
+    const tweets = await Tweet.aggregate([
+      {
+        $match: {
+          owner: new mongoose.Types.ObjectId(userId),
+        },
       },
-    },
-    {
-      $lookup: {
-        from: "likes",
-        localField: "_id",
-        foreignField: "tweetId",
-        as: "likes",
+      {
+        $lookup: {
+          from: "likes",
+          localField: "_id",
+          foreignField: "tweetId",
+          as: "likes",
+        },
       },
-    },
-    {
-      $lookup: {
-        from: "users",
-        localField: "owner",
-        foreignField: "_id",
-        as: "ownerDetails",
-        pipeline: [
-          {
-            $project: {
-              username: 1,
-              avatar: 1,
-              fullName: 1,
+      {
+        $lookup: {
+          from: "users",
+          localField: "owner",
+          foreignField: "_id",
+          as: "ownerDetails",
+          pipeline: [
+            {
+              $project: {
+                username: 1,
+                avatar: 1,
+                fullName: 1,
+              },
             },
-          },
-        ],
+          ],
+        },
       },
-    },
-    {
-      $addFields: {
-        likesCount: { $size: "$likes" },
-        owner: { $first: "$ownerDetails" },
-        isLiked: {
-          $cond: {
-            if: { $in: [req.user?._id, "$likes.likedBy"] },
-            then: true,
-            else: false,
+      {
+        $addFields: {
+          likesCount: { $size: "$likes" },
+          owner: { $first: "$ownerDetails" },
+          isLiked: {
+            $cond: {
+              if: { $in: [req.user?._id, "$likes.likedBy"] },
+              then: true,
+              else: false,
+            },
           },
         },
       },
-    },
-    {
-      $sort: {
-        createdAt: -1,
+      {
+        $sort: {
+          createdAt: -1,
+        },
       },
-    },
-    {
-      $project: {
-        likes: 0,
-        ownerDetails: 0,
+      {
+        $project: {
+          likes: 0,
+          ownerDetails: 0,
+        },
       },
-    },
-  ]);
+    ]);
 
-  return res
-    .status(200)
-    .json(new ApiResponse(200, tweets, "Tweets fetched successfully"));
-});
+    return res
+      .status(200)
+      .json(new ApiResponse(200, tweets, "Tweets fetched successfully"));
+  }
+);
 
-export const updateTweet = asyncHandler(async (req, res) => {
-  const { tweetId } = req.params;
+export const updateTweet = asyncHandler(async (req: Request, res: Response) => {
+  const { tweetId } = req.params as { tweetId: string };
   const { content } = req.body;
 
   // 1. Validation: Check if tweetId is valid
@@ -141,7 +144,7 @@ export const updateTweet = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, updatedTweet, "Tweet updated successfully"));
 });
 
-export const deleteTweet = asyncHandler(async (req, res) => {
+export const deleteTweet = asyncHandler(async (req: Request, res: Response) => {
   const { tweetId } = req.params;
 
   // 1. Validation: Check if tweetId is a valid MongoDB ID

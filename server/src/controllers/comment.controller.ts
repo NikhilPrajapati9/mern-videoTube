@@ -5,9 +5,10 @@ import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { Video } from "../models/video.model.js";
 import { Like } from "../models/like.model.js";
+import { Request, Response } from "express";
 
 export const getVideoComments = asyncHandler(async (req, res) => {
-  const { videoId } = req.params;
+  const { videoId } = req.params as { videoId: string };
   const { page = 1, limit = 10 } = req.query;
 
   if (!isValidObjectId(videoId)) {
@@ -51,8 +52,8 @@ export const getVideoComments = asyncHandler(async (req, res) => {
   ]);
 
   const options = {
-    page: parseInt(page, 10),
-    limit: parseInt(limit, 10),
+    page: parseInt(page as string, 10),
+    limit: parseInt(limit as string, 10),
   };
 
   const result = await Comment.aggregatePaginate(aggregate, options);
