@@ -62,7 +62,9 @@ export const getChannelStats = asyncHandler(
 
 export const getChannelVideos = asyncHandler(
   async (req: Request, res: Response) => {
-    const { page = 1, limit = 10, sortBy = "createdAt", sortType } = req.query;
+    const { query } = (req as any).validated;
+
+    const { page = 1, limit = 10, sortBy = "createdAt", sortType } = query;
     const { userId } = req.params as { userId: string };
 
     const pipeline = [];

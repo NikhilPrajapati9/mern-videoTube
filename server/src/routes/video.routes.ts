@@ -11,13 +11,23 @@ import {
   uploadAVideo,
 } from "../controllers/video.controller.js";
 import { upload } from "../middlewares/multer.middleware.js";
+import { validate } from "../middlewares/validate.js";
+import {
+  deleteVideoSchema,
+  getAllVideosSchema,
+  getVideoByIdSchema,
+  recoverVideoSchema,
+  togglePublishStatusSchema,
+  updateVideoSchema,
+  uploadVideoSchema,
+} from "../validators/video.validator.js";
 
 const router = Router();
 router.use(verifyJWT);
 
 router
   .route("/")
-  .get(getAllVideos)
+  .get(validate(getAllVideosSchema), getAllVideos)
   .post(
     upload.fields([
       {
@@ -29,19 +39,25 @@ router
         maxCount: 1,
       },
     ]),
+    validate(uploadVideoSchema),
     uploadAVideo
   );
 
-router.route("/deletedVideo").get(getAllDeletedVideos);
+router
+  .route("/deletedVideo")
+  .get(validate(deleteVideoSchema), getAllDeletedVideos);
 
 router
   .route("/:videoId")
-  .get(getVideoById)
-  .delete(deleteVideo)
-  .patch(upload.single("thumbnail"), updateVideo);
+  .get(validate(getVideoByIdSchema), getVideoById)
+  .delete(validate(deleteVideoSchema), deleteVideo)
+  .patch(validate(updateVideoSchema), upload.single("thumbnail"), updateVideo);
 
-router.route("/recover/:videoId").patch(recoverVideo);
-router.route("/toggle/pusblish/:videoId").patch(togglePublishStatus);
-
+router
+  .route("/recover/:videoId")
+  .patch(validate(recoverVideoSchema), recoverVideo);
+router
+  .route("/toggle/pusblish/:videoId")
+  .patch(validate(togglePublishStatusSchema), togglePublishStatus);
 
 export default router;

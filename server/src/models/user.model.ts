@@ -19,6 +19,16 @@ const userSchema = new Schema(
       lowercase: true,
       trim: true,
     },
+    googleId: {
+      type: String,
+      unique: true,
+      sparse: true, // Takki null values par unique constraint error na aaye
+    },
+    authProvider: {
+      type: String,
+      enum: ["local", "google"],
+      default: "local",
+    },
     fullName: {
       type: String,
       required: true,
@@ -32,7 +42,9 @@ const userSchema = new Schema(
       },
       public_id: {
         type: String,
-        required: true,
+        required: function () {
+          return this.authProvider === "local";
+        },
       },
     },
     coverImage: {
@@ -51,7 +63,9 @@ const userSchema = new Schema(
     ],
     password: {
       type: String,
-      required: [true, "Password is required"],
+      required: function () {
+        return this.authProvider === "local";
+      },
     },
     refreshToken: {
       type: String,
@@ -63,8 +77,8 @@ const userSchema = new Schema(
 );
 
 userSchema.pre("save", async function () {
-  if (!this.isModified("password")) return;
-  this.password = await bcrypt.hash(this.password, 10);
+  if (!this.password || !this.isModified("password")) return;
+  this.password = bcrypt.hashSync(this.password, 10);
 });
 
 userSchema.methods.isPasswordCorrect = async function (password: string) {

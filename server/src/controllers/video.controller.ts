@@ -16,9 +16,9 @@ export const getAllVideos = asyncHandler(
       limit = 10,
       query,
       sortBy = "createdAt",
-      sortType,
+      sortType = "desc",
       userId,
-    } = req.query;
+    } = (req as any).validated.query;
 
     const pipeline = [];
 
@@ -30,7 +30,6 @@ export const getAllVideos = asyncHandler(
       },
     });
 
-    // 2. Search Query (Text search)
     if (query) {
       pipeline.push({
         $match: {
@@ -42,7 +41,6 @@ export const getAllVideos = asyncHandler(
       });
     }
 
-    // 3. Filter by specific userId
     if (userId) {
       if (!isValidObjectId(userId)) {
         throw new ApiError(400, "Invalid User ID");
@@ -54,7 +52,6 @@ export const getAllVideos = asyncHandler(
       });
     }
 
-    // 4. Sorting
     const sortColumn = (sortBy as string) || "createdAt";
     const sortDirection = sortType === "asc" ? 1 : -1;
 
@@ -84,12 +81,12 @@ export const getAllVideos = asyncHandler(
 
     // Result Handling
     if (!result || result.docs.length === 0) {
-      res
+      return res
         .status(200)
         .json(new ApiResponse(200, { docs: [] }, "No videos found"));
     }
 
-    res
+    return res
       .status(200)
       .json(new ApiResponse(200, result, "Videos fetched successfully"));
   }
@@ -102,7 +99,7 @@ export const getAllDeletedVideos = asyncHandler(
       limit = 10,
       sortBy = "deletedAt",
       sortType = "desc",
-    } = req.query;
+    } = (req as any).validated.query;
     const userId = req.user._id;
 
     const pipeline = [];
@@ -179,8 +176,9 @@ export const getAllDeletedVideos = asyncHandler(
 
 export const uploadAVideo = asyncHandler(
   async (req: Request, res: Response) => {
-    const { title, description } = req.body;
-    const files = req.files as
+    const { body } = (req as any).validated;
+    const { title, description } = body;
+    const files = (req as any).validated.files as
       | { [fieldname: string]: Express.Multer.File[] }
       | undefined;
     const videoLocalPath = files?.videoFile?.[0]?.path;
@@ -235,7 +233,7 @@ export const uploadAVideo = asyncHandler(
 
 export const getVideoById = asyncHandler(
   async (req: Request, res: Response) => {
-    const { videoId } = req.params;
+    const { videoId } = (req as any).validated.params;
     //TODO: get video by id
 
     if (!videoId) {
@@ -330,9 +328,10 @@ export const getVideoById = asyncHandler(
 );
 
 export const updateVideo = asyncHandler(async (req: Request, res: Response) => {
-  const { videoId } = req.params;
-  const { title, description } = req.body;
-  const thumbnailLocalPath = req.file?.path;
+  const { body, params, file } = (req as any).validated;
+  const { videoId } = params;
+  const { title, description } = body;
+  const thumbnailLocalPath = file?.path;
 
   if (!videoId) {
     throw new ApiError(400, "video id is required");
@@ -358,11 +357,10 @@ export const updateVideo = asyncHandler(async (req: Request, res: Response) => {
       throw new ApiError(400, "Error while uploading thumbnail");
     }
 
-    // Purani thumbnail delete karo agar nayi aa gayi hai
-    // Aur check karo ki purani wali auto-generated toh nahi thi (varna ID nahi hogi)
+    
     if (video.thumbnail?.public_id) {
       try {
-        // fileType "image"
+
         await deleteFromCloudinary(video.thumbnail.public_id, "image");
       } catch (error) {
         console.log("Old thumbnail deletion failed", error);
@@ -402,7 +400,7 @@ export const updateVideo = asyncHandler(async (req: Request, res: Response) => {
 });
 
 export const deleteVideo = asyncHandler(async (req: Request, res: Response) => {
-  const { videoId } = req.params;
+  const { videoId } = (req as any).validated.params;
 
   if (!videoId) {
     throw new ApiError(400, "Video Id is required");
@@ -432,7 +430,7 @@ export const deleteVideo = asyncHandler(async (req: Request, res: Response) => {
 
 export const recoverVideo = asyncHandler(
   async (req: Request, res: Response) => {
-    const { videoId } = req.params;
+    const { videoId } = (req as any).validated.params;
     if (!videoId) {
       throw new ApiError(400, "Video Id is required");
     }

@@ -7,9 +7,16 @@ import {
   deleteFromCloudinary,
   uploadOnCloudinary,
 } from "../utils/cloudinary.js";
-import mongoose, { mongo } from "mongoose";
+import mongoose from "mongoose";
 import { Request, Response } from "express";
 import { cookiesOptions } from "../types.js";
+import { generateCodeVerifier, generateState, Google } from "arctic";
+
+const google = new Google(
+  process.env.GOOGLE_CLIENT_ID as string,
+  process.env.GOOGLE_CLIENT_SECRET as string,
+  process.env.GOOGLE_REDIRECT_URI as string
+);
 
 const generateAccessAndRefrehToken = async (
   userId: mongoose.Types.ObjectId
@@ -36,10 +43,98 @@ const generateAccessAndRefrehToken = async (
   }
 };
 
+export const handleGoogleOAuthRedirect = asyncHandler(
+  async (_, res: Response) => {
+    const state = generateState(); // generate random string
+    const codeVerifier = generateCodeVerifier(); // Arctic ka function
+
+    const url = google.createAuthorizationURL(state, codeVerifier, [
+      "profile",
+      "email",
+    ]);
+
+    // Security ke liye state aur verifier ko cookies mein save karein
+    res.cookie("google_oauth_state", state, { httpOnly: true });
+    res.cookie("google_code_verifier", codeVerifier, { httpOnly: true });
+
+    res.redirect(url.toString());
+  }
+);
+
+export const handleGoogleOAuthCallback = asyncHandler(
+  async (req: Request, res: Response) => {
+    const code = req.query.code;
+    const state = req.query.state;
+    const storedState = req.cookies.google_oauth_state;
+    const codeVerifier = req.cookies.google_code_verifier;
+
+    if (!code || !state || state !== storedState) {
+      return res.status(400).send("Invalid request");
+    }
+
+    const tokens = await google.validateAuthorizationCode(
+      code as string,
+      codeVerifier
+    );
+
+    // 2. Google se user info mangwayein
+    const response = await fetch(
+      "https://openidconnect.googleapis.com/v1/userinfo",
+      {
+        headers: { Authorization: `Bearer ${tokens.accessToken}` },
+      }
+    );
+    const googleUser = await response.json();
+
+    const { sub: googleId, email, name, picture } = googleUser;
+
+    let user = await User.findOne({
+      $or: [{ googleId: googleId }, { email: email }],
+    });
+
+    if (!user) {
+      // Naya user banayein
+      user = await User.create({
+        username: email.split("@")[0] + Math.floor(Math.random() * 1000),
+        email,
+        fullName: name,
+        googleId,
+        authProvider: "google",
+        avatar: {
+          url: picture,
+          public_id: "google_hosted", // Dummy ID ya optional field
+        },
+      });
+    } else if (user.authProvider === "local") {
+      // Link Google to existing local account
+      user.googleId = googleId;
+      user.authProvider = "google";
+      await user.save();
+    }
+
+    // 2. Use your existing methods
+    const accessToken = user.generateAccessToken();
+    const refreshToken = user.generateRefreshToken();
+
+    user.refreshToken = refreshToken;
+    await user.save({ validateBeforeSave: false });
+
+    // 3. Send to Client
+    const options = { httpOnly: true, secure: true };
+    return res
+      .status(200)
+      .cookie("accessToken", accessToken, options)
+      .cookie("refreshToken", refreshToken, options)
+      .redirect(process.env.CLIENT_URL as string);
+  }
+);
+
 export const registerUser = asyncHandler(
   async (req: Request, res: Response) => {
-    const { username, email, fullName, password } = req.body;
-    const files = req.files as
+    const { body } = (req as any).validated;
+
+    const { username, email, fullName, password } = body;
+    const files = (req as any).validated.files as
       | { [fieldname: string]: Express.Multer.File[] }
       | undefined;
     const avatarLocalPath = files?.avatar?.[0]?.path;
@@ -111,7 +206,8 @@ export const registerUser = asyncHandler(
 );
 
 export const loginUser = asyncHandler(async (req: Request, res: Response) => {
-  const { email, username, password } = req.body;
+  const { body } = (req as any).validated;
+  const { email, username, password } = body;
 
   if (!(email || username)) {
     throw new ApiError(400, "username or email is required");
@@ -187,7 +283,7 @@ export const logoutUser = asyncHandler(async (req: Request, res: Response) => {
 export const refreshAccessToken = asyncHandler(
   async (req: Request, res: Response) => {
     const incomingRefreshToken =
-      req.cookies?.refreshToken || req.body.refreshToken;
+      req.cookies?.refreshToken || (req as any).validated.refreshToken;
 
     if (!incomingRefreshToken) {
       throw new ApiError(401, "Unauthorized request");
@@ -238,7 +334,8 @@ export const refreshAccessToken = asyncHandler(
 
 export const changeCurrentPassword = asyncHandler(
   async (req: Request, res: Response) => {
-    const { oldPassword, newPassword } = req.body;
+    const { body } = (req as any).validated;
+    const { oldPassword, newPassword } = body;
 
     const userId = req.user._id;
 
@@ -269,7 +366,8 @@ export const getCurrentUser = asyncHandler(
 
 export const updateAccountDetails = asyncHandler(
   async (req: Request, res: Response) => {
-    const { fullName, username } = req.body;
+    const { body } = (req as any).validated;
+    const { fullName, username } = body;
 
     if (!fullName?.trim() || !username?.trim()) {
       throw new ApiError(400, "Full name and username are required");
@@ -308,7 +406,8 @@ export const updateAccountDetails = asyncHandler(
 
 export const checkUsernameAvailability = asyncHandler(
   async (req: Request, res: Response) => {
-    const { username } = req.query as { username: string };
+    const { query } = (req as any).validated;
+    const { username } = query as { username: string };
 
     if (!username) {
       throw new ApiError(400, "Username is required");
@@ -333,7 +432,9 @@ export const checkUsernameAvailability = asyncHandler(
 
 export const updateUserAvatar = asyncHandler(
   async (req: Request, res: Response) => {
-    const avatarLocalPath = req.file?.path;
+    const { file } = (req as any).validated;
+    const avatarLocalPath = file?.path;
+    console.log("avatarLocalPath => ", avatarLocalPath);
 
     if (!avatarLocalPath) {
       throw new ApiError(400, "Avatar file is missing.");
@@ -389,7 +490,8 @@ export const updateUserAvatar = asyncHandler(
 
 export const updateUserCoverImage = asyncHandler(
   async (req: Request, res: Response) => {
-    const coverImageLocalPath = req.file?.path;
+    const { file } = (req as any).validated;
+    const coverImageLocalPath = file?.path;
 
     if (!coverImageLocalPath) {
       throw new ApiError(400, "Avatar file is missing.");
@@ -443,7 +545,9 @@ export const updateUserCoverImage = asyncHandler(
 
 export const getUserChannelProfile = asyncHandler(
   async (req: Request, res: Response) => {
-    const { username } = req.params as { username: string };
+    const { params } = (req as any).validated;
+
+    const { username } = params as { username: string };
 
     if (!username?.trim()) {
       throw new ApiError(400, "Username is missing");

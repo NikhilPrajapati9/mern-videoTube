@@ -7,7 +7,8 @@ import { Like } from "../models/like.model.js";
 import { Request, Response } from "express";
 
 export const createTweet = asyncHandler(async (req: Request, res: Response) => {
-  const { content } = req.body;
+  const { body } = (req as any).validated;
+  const { content } = body;
 
   if (!content || content.trim() === "") {
     throw new ApiError(400, "Content is required and cannot be empty");
@@ -29,7 +30,8 @@ export const createTweet = asyncHandler(async (req: Request, res: Response) => {
 
 export const getUserTweets = asyncHandler(
   async (req: Request, res: Response) => {
-    const { userId } = req.params as { userId: string };
+    const { params } = (req as any).validated;
+    const { userId } = params as { userId: string };
 
     if (!mongoose.isValidObjectId(userId)) {
       throw new ApiError(400, "Invalid User ID");
@@ -99,8 +101,9 @@ export const getUserTweets = asyncHandler(
 );
 
 export const updateTweet = asyncHandler(async (req: Request, res: Response) => {
-  const { tweetId } = req.params as { tweetId: string };
-  const { content } = req.body;
+  const { body, params } = (req as any).validated;
+  const { tweetId } = params as { tweetId: string };
+  const { content } = body;
 
   // 1. Validation: Check if tweetId is valid
   if (!isValidObjectId(tweetId)) {
@@ -145,7 +148,8 @@ export const updateTweet = asyncHandler(async (req: Request, res: Response) => {
 });
 
 export const deleteTweet = asyncHandler(async (req: Request, res: Response) => {
-  const { tweetId } = req.params;
+  const { params } = (req as any).validated;
+  const { tweetId } = params;
 
   // 1. Validation: Check if tweetId is a valid MongoDB ID
   if (!isValidObjectId(tweetId)) {

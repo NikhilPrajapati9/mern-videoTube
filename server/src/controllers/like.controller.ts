@@ -7,7 +7,8 @@ import { Request, Response } from "express";
 
 export const toggleVideoLike = asyncHandler(
   async (req: Request, res: Response) => {
-    const { videoId } = req.params;
+    const { params } = (req as any).validated;
+    const { videoId } = params;
 
     if (!isValidObjectId(videoId)) {
       throw new ApiError(400, "Invalid Video ID");
@@ -43,7 +44,8 @@ export const toggleVideoLike = asyncHandler(
 
 export const toggleCommentLike = asyncHandler(
   async (req: Request, res: Response) => {
-    const { commentId } = req.params;
+    const { params } = (req as any).validated;
+    const { commentId } = params;
 
     if (!isValidObjectId(commentId)) {
       throw new ApiError(400, "Invalid Video ID");
@@ -83,7 +85,8 @@ export const toggleCommentLike = asyncHandler(
 
 export const toggleTweetLike = asyncHandler(
   async (req: Request, res: Response) => {
-    const { tweetId } = req.params;
+    const { params } = (req as any).validated;
+    const { tweetId } = params;
 
     if (!isValidObjectId(tweetId)) {
       throw new ApiError(400, "Invalid Video ID");
@@ -119,7 +122,8 @@ export const toggleTweetLike = asyncHandler(
 
 export const getLikedVideos = asyncHandler(
   async (req: Request, res: Response) => {
-    const { page = 1, limit = 10 } = req.query;
+    const { query } = (req as any).validated;
+    const { page = 1, limit = 10 } = query;
     const userId = req.user?._id;
 
     const likedVideosAggregation = Like.aggregate([
@@ -227,7 +231,8 @@ export const getLikedVideos = asyncHandler(
 
 export const getLikedComments = asyncHandler(
   async (req: Request, res: Response) => {
-    const { page = 1, limit = 10 } = req.query;
+    const { query } = (req as any).validated;
+    const { page = 1, limit = 10 } = query;
     const userId = req.user?._id;
 
     const likedCommentsAggregation = Like.aggregate([
@@ -336,7 +341,8 @@ export const getLikedComments = asyncHandler(
 
 export const getLikedTweets = asyncHandler(
   async (req: Request, res: Response) => {
-    const { page = 1, limit = 10 } = req.query;
+    const { query } = (req as any).validated;
+    const { page = 1, limit = 10 } = query;
     const userId = req.user?._id;
 
     const likedTweetsAggregation = Like.aggregate([

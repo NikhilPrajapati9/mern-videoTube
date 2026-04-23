@@ -10,7 +10,8 @@ import { PlaylistVideo } from "../models/playlistVideos.model.js";
 
 export const createPlaylist = asyncHandler(
   async (req: Request, res: Response) => {
-    const { name, description } = req.body;
+    const { body } = (req as any).validated;
+    const { name, description } = body;
 
     if (!name?.trim() || !description?.trim()) {
       throw new ApiError(400, "Name and Description is required");
@@ -36,8 +37,9 @@ export const createPlaylist = asyncHandler(
 
 export const getOwnPlaylists = asyncHandler(
   async (req: Request, res: Response) => {
+    const { query } = (req as any).validated;
     const userId = req.user._id;
-    const { sortBy = "createdAt", sortType = "desc" } = req.query;
+    const { sortBy = "createdAt", sortType = "desc" } = query;
 
     if (!userId) {
       throw new ApiError(401, "User is not authenticated");
@@ -54,7 +56,6 @@ export const getOwnPlaylists = asyncHandler(
       return res
         .status(200)
         .json(new ApiResponse(200, [], "No playlists found for this user"));
-      
     }
 
     return res
@@ -65,8 +66,9 @@ export const getOwnPlaylists = asyncHandler(
 
 export const getUserPlaylists = asyncHandler(
   async (req: Request, res: Response) => {
-    const { userId } = req.params;
-    const { sortBy = "createdAt", sortType = "desc" } = req.query;
+    const { query, params } = (req as any).validated;
+    const { userId } = params;
+    const { sortBy = "createdAt", sortType = "desc" } = query;
 
     if (!userId) {
       throw new ApiError(400, "Invalid User ID");
@@ -84,7 +86,6 @@ export const getUserPlaylists = asyncHandler(
       return res
         .status(200)
         .json(new ApiResponse(200, [], "No playlists found for this user"));
-      
     }
 
     return res
@@ -95,8 +96,9 @@ export const getUserPlaylists = asyncHandler(
 
 export const getPlaylistVideosById = asyncHandler(
   async (req: Request, res: Response) => {
-    const { playlistId } = req.params as { playlistId: string };
-    const { page = 1, limit = 10 } = req.query;
+    const { query, params } = (req as any).validated;
+    const { playlistId } = params as { playlistId: string };
+    const { page = 1, limit = 10 } = query;
 
     if (!isValidObjectId(playlistId)) {
       throw new ApiError(400, "Invalid Playlist ID");
@@ -187,7 +189,8 @@ export const getPlaylistVideosById = asyncHandler(
 
 export const getPlaylistDataById = asyncHandler(
   async (req: Request, res: Response) => {
-    const { playlistId } = req.params as { playlistId: string };
+    const { params } = (req as any).validated;
+    const { playlistId } = params as { playlistId: string };
 
     if (!isValidObjectId(playlistId)) {
       throw new ApiError(400, "Invalid Playlist ID");
@@ -241,7 +244,8 @@ export const getPlaylistDataById = asyncHandler(
 
 export const addVideoToPlaylist = asyncHandler(
   async (req: Request, res: Response) => {
-    const { playlistId, videoId } = req.params;
+    const { params } = (req as any).validated;
+    const { playlistId, videoId } = params;
 
     // 1. Validations
     if (!isValidObjectId(playlistId) || !isValidObjectId(videoId)) {
@@ -273,7 +277,6 @@ export const addVideoToPlaylist = asyncHandler(
       return res
         .status(400)
         .json(new ApiResponse(400, null, "Video is already in this playlist"));
-      
     }
 
     // 5. Create Entry
@@ -299,7 +302,8 @@ export const addVideoToPlaylist = asyncHandler(
 
 export const removeVideoFromPlaylist = asyncHandler(
   async (req: Request, res: Response) => {
-    const { playlistId, videoId } = req.params;
+    const { params } = (req as any).validated;
+    const { playlistId, videoId } = params;
 
     // 1. Validations
     if (!isValidObjectId(playlistId) || !isValidObjectId(videoId)) {
@@ -343,7 +347,8 @@ export const removeVideoFromPlaylist = asyncHandler(
 
 export const deletePlaylist = asyncHandler(
   async (req: Request, res: Response) => {
-    const { playlistId } = req.params as { playlistId: string };
+    const { params } = (req as any).validated;
+    const { playlistId } = params as { playlistId: string };
 
     if (!isValidObjectId(playlistId)) {
       throw new ApiError(400, "Invalid Playlist ID");
@@ -379,8 +384,9 @@ export const deletePlaylist = asyncHandler(
 
 export const updatePlaylist = asyncHandler(
   async (req: Request, res: Response) => {
-    const { playlistId } = req.params;
-    const { name, description } = req.body;
+    const { body, params } = (req as any).validated;
+    const { playlistId } = params;
+    const { name, description } = body;
 
     if (!isValidObjectId(playlistId)) {
       throw new ApiError(400, "Invalid Playlist ID");
@@ -417,7 +423,8 @@ export const updatePlaylist = asyncHandler(
 
 export const togglePublishStatus = asyncHandler(
   async (req: Request, res: Response) => {
-    const { playlistId } = req.params;
+    const {  params } = (req as any).validated;
+    const { playlistId } = params;
     if (!isValidObjectId(playlistId)) {
       throw new ApiError(400, "Invalid Playlist ID");
     }

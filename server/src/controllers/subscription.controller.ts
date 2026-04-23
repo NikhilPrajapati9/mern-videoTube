@@ -7,7 +7,8 @@ import { Request, Response } from "express";
 
 export const toggleSubscription = asyncHandler(
   async (req: Request, res: Response) => {
-    const { channelId } = req.params;
+    const { params } = (req as any).validated;
+    const { channelId } = params;
 
     // 1. Validation: Check if channelId is a valid MongoDB ID
     if (!isValidObjectId(channelId)) {

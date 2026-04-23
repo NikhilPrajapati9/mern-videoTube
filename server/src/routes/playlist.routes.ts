@@ -12,22 +12,48 @@ import {
   updatePlaylist,
 } from "../controllers/playlist.controller.js";
 import { verifyJWT } from "../middlewares/auth.middleware.js";
+import { validate } from "../middlewares/validate.js";
+import {
+  addVideoToPlaylistSchema,
+  createPlaylistSchema,
+  deletePlaylistSchema,
+  getOwnPlaylistsSchema,
+  getPlaylistDataByIdSchema,
+  getPlaylistVideosByIdSchema,
+  getUserPlaylistsSchema,
+  removeVideoFromPlaylistSchema,
+  updatePlaylistSchema,
+} from "../validators/playlist.validator.js";
+import { togglePublishStatusSchema } from "../validators/video.validator.js";
 
 const router = Router();
 
 router.use(verifyJWT);
 
-router.route("/").get(getOwnPlaylists).post(createPlaylist);
-router.route("/user/:userId").get(getUserPlaylists);
+router
+  .route("/")
+  .get(validate(getOwnPlaylistsSchema), getOwnPlaylists)
+  .post(validate(createPlaylistSchema), createPlaylist);
+router
+  .route("/user/:userId")
+  .get(validate(getUserPlaylistsSchema), getUserPlaylists);
 router
   .route("/:playlistId")
-  .get(getPlaylistDataById)
-  .delete(deletePlaylist)
-  .patch(updatePlaylist);
+  .get(validate(getPlaylistDataByIdSchema), getPlaylistDataById)
+  .delete(validate(deletePlaylistSchema), deletePlaylist)
+  .patch(validate(updatePlaylistSchema), updatePlaylist);
 
-router.route("/add/:playlistId/:videoId").post(addVideoToPlaylist);
-router.route("/remove/:playlistId/:videoId").post(removeVideoFromPlaylist);
-router.route("/toggle/pusblish/:playlistId").patch(togglePublishStatus);
-router.route("/videos/:playlistId").get(getPlaylistVideosById);
+router
+  .route("/add/:playlistId/:videoId")
+  .post(validate(addVideoToPlaylistSchema), addVideoToPlaylist);
+router
+  .route("/remove/:playlistId/:videoId")
+  .post(validate(removeVideoFromPlaylistSchema), removeVideoFromPlaylist);
+router
+  .route("/toggle/pusblish/:playlistId")
+  .patch(validate(togglePublishStatusSchema), togglePublishStatus);
+router
+  .route("/videos/:playlistId")
+  .get(validate(getPlaylistVideosByIdSchema), getPlaylistVideosById);
 
 export default router;
